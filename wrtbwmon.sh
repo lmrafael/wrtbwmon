@@ -49,43 +49,37 @@ updatefilters()
 	fi
 
 	#For each host in the ARP table
-	HOSTS=$(grep $IF_LAN /proc/net/arp | awk '{print $4" "$1}')
-	echo "$HOSTS" | while read MAC IP
+	grep $IF_LAN /proc/net/arp | while read IP TYPE FLAGS MAC MASK IFACE
 	do
 		if [ ! $IP ]; then 
 			continue
 		fi
+
 		CURRHOST="$MAC $IP"
-	
+
 		echo "Checking counters for $CURRHOST..."
-	
+
 		#Is MAC is assigned to the same IP as last time ?
 		touch "$ARPFILE"
 		grep "$CURRHOST" "$ARPFILE" > /dev/null
 		if [ $? -ne 0 ]; then
 			echo "New/modified entity : $MAC / $IP"
-			#List the entities in iptables
-			ITERATOR=0
-			iptables -L RRDIPT --line-numbers -n|awk "{ if ((\$5 == \"$IP\")||(\$6 == \"$IP\" )) print \$1 }" | while read INDEX
-			do
-				#Since iptables decreases the number we have to decrement the index..
-				INDEX=$(expr $INDEX - $ITERATOR)
-				ITERATOR=$(expr $ITERATOR + 1)
-				#Remove the old iptable for that ip.
-				iptables -v -D RRDIPT $INDEX
-			done
+			
 			#Add iptable rules (if non existing).
-			iptables -I RRDIPT -d $IP -j RETURN
-			iptables -I RRDIPT -s $IP -j RETURN
+			iptables -nL RRDIPT | grep $IP > /dev/null
+			if [ $? -ne 0 ]; then
+				iptables -I RRDIPT -d $IP -j RETURN
+				iptables -I RRDIPT -s $IP -j RETURN
+			fi
 
 			#Update the ARP file
-			#-v to grep is the same as reverse grep..
 			grep -v "$MAC" "$ARPFILE" | grep -v $IP > "$ARPFILE.new"
 			mv "$ARPFILE.new" "$ARPFILE"
 			echo ${CURRHOST} >> "$ARPFILE"
 		fi
 	done	
 }
+
 
 createDb()
 {
