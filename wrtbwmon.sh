@@ -26,6 +26,19 @@ formatnumber()
    fi
 }
 
+lock()
+{
+	while [ -f /tmp/wrtbwmon.lock ]; do
+		sleep 1
+	done
+	echo $$ > /tmp/wrtbwmon.lock
+}
+
+unlock()
+{
+	rm -f /tmp/wrtbwmon.lock
+}
+
 case $1 in
 
 "setup" )
@@ -53,6 +66,7 @@ case $1 in
 
 		CURRHOST="$MAC $IP"
 
+		lock
 		#Is MAC is assigned to the same IP as last time ?
 		grep "$CURRHOST" /tmp/arpfile.log > /dev/null
 		if [ $? -ne 0 ]; then
@@ -70,12 +84,15 @@ case $1 in
 			mv /tmp/arpfile.new /tmp/arpfile.log
 			echo ${CURRHOST} >> /tmp/arpfile.log
 		fi
+		unlock
 	done	
 	;;
 	
 "update" )
 	[ -z "$2" ] && echo "Missing argument 2" && exit 1
 	touch $2
+
+	lock
 
 	#Read and reset counters
 	iptables -L RRDIPT -vnxZ -t filter > /tmp/traffic.tmp
@@ -116,9 +133,10 @@ case $1 in
 	done
 	
 	#Free some memory
-	rm /tmp/traffic.tmp
-	rm /tmp/in.tmp
-	rm /tmp/out.tmp
+	rm -f /tmp/traffic.tmp
+	rm -f /tmp/in.tmp
+	rm -f /tmp/out.tmp
+	unlock
 	;;
 	
 "publish" )
@@ -127,29 +145,31 @@ case $1 in
 	[ -z "$3" ] && echo "Missing argument 3" && exit 1
 	[ -z "$4" ] && USERSFILE="/dev/null" || USERSFILE=$4
 
+	lock
 	# create HTML page
 	echo "<html><head><title>Traffic</title></head><body>" > $3
 	echo "<h1>Total Usage :</h1>" >> $3
 	echo "<table border="1"><tr bgcolor=silver><td>User</td><td>Peak download</td><td>Peak upload</td><td>Offpeak download</td><td>Offpeak upload</td><td>Last seen</td></tr>" >> $3
 	cat $2 | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
-		do
-			USER=$(grep $MAC $USERSFILE | cut -f2 -s -d= )
-			[ -z "$USER" ] && USER=$MAC
-			echo "<tr><td>$USER</td><td>" >> $3
-			formatnumber "$PEAKUSAGE_IN" $3
-			echo "</td><td>" >> $3
-			formatnumber "$PEAKUSAGE_OUT" $3
-			echo "</td><td>" >> $3
-			formatnumber "$OFFPEAKUSAGE_IN" $3
-			echo "</td><td>" >> $3
-			formatnumber "$OFFPEAKUSAGE_OUT" $3
-			echo "</td><td>" >> $3
-			echo "$LASTSEEN" >> $3
-			echo "</td></tr>" >> $3
-		done
+	do
+		USER=$(grep $MAC $USERSFILE | cut -f2 -s -d= )
+		[ -z "$USER" ] && USER=$MAC
+		echo "<tr><td>$USER</td><td>" >> $3
+		formatnumber "$PEAKUSAGE_IN" $3
+		echo "</td><td>" >> $3
+		formatnumber "$PEAKUSAGE_OUT" $3
+		echo "</td><td>" >> $3
+		formatnumber "$OFFPEAKUSAGE_IN" $3
+		echo "</td><td>" >> $3
+		formatnumber "$OFFPEAKUSAGE_OUT" $3
+		echo "</td><td>" >> $3
+		echo "$LASTSEEN" >> $3
+		echo "</td></tr>" >> $3
+	done
 	echo "</table>" >> $3
 	echo "<br /><small>This page was generated on `date`</small>" >> $3
 	echo "</body></html>" >> $3
+	unlock
 	;;
 
 *)
