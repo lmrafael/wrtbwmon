@@ -2,9 +2,9 @@
 #
 # Traffic logging tool for OpenWRT-based routers
 #
-# Created by Emmanuel Brucy (emmanuel.brucy@gmail.com)
+# Created by Emmanuel Brucy (e.brucy AT qut.edu.au)
 #
-# Based on work from Fredrik Erlandsson (erlis@linux.nu)
+# Based on work from Fredrik Erlandsson (erlis AT linux.nu)
 # Based on traff_graph script by twist - http://wiki.openwrt.org/RrdTrafficWatch
 
 formatnumber()
@@ -180,8 +180,10 @@ case $1 in
 	echo "   $0 publish database_file path_of_html_report [user_file]"
 	echo "Examples : "
 	echo "   $0 setup br0"
-	echo "   $0 update /jffs/wrtbwmon.db offpeak"
-	echo "   $0 publish /jffs/wrtbwmon.db /www/user/usage.htm /jffs/wrtdwmonusers.txt"
+	echo "   $0 update /tmp/usage.db offpeak"
+	echo "   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt"
+	echo "Note : [user_file] is an optional file to match users with their MAC address"
+	echo "       Its format is : 00:MA:CA:DD:RE:SS=username , with one entry per line"
 	exit
 	;;
 esac
