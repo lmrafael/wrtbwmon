@@ -90,6 +90,10 @@ case $1 in
 	
 "update" )
 	[ -z "$2" ] && echo "Missing argument 2" && exit 1
+	
+	#HERE you can insert a command to retrieve a abckup in case the database is missing
+	# [ ! -f $2 ] && wget some_url
+	
 	touch $2
 
 	lock
@@ -103,21 +107,30 @@ case $1 in
 		#Have to use temporary files because of crappy busybox shell
 		grep $IP /tmp/traffic.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
 		do
-			[ "$SRC" = "$IP" ] && echo $(($BYTES/1024)) > /tmp/in.tmp
-			[ "$DST" = "$IP" ] && echo $(($BYTES/1024)) > /tmp/out.tmp
+			[ "$DST" = "$IP" ] && echo $(($BYTES/1024)) > /tmp/in.tmp
+			[ "$SRC" = "$IP" ] && echo $(($BYTES/1024)) > /tmp/out.tmp
 		done
 		
 		IN=$(cat /tmp/in.tmp)
 		OUT=$(cat /tmp/out.tmp)
 		
 		if [ $IN -gt 0 -o $OUT -gt 0 ];  then
-			echo "New traffic for $MAC since last update : $IN:$OUT"
+			echo "New traffic for $MAC since last update : $INk:$OUTk"
 		
-			PEAKUSAGE_IN=$(grep $MAC $2 | cut -f2 -s -d, )
-			PEAKUSAGE_OUT=$(grep $MAC $2 | cut -f3 -s -d, )
-			OFFPEAKUSAGE_IN=$(grep $MAC $2 | cut -f4 -s -d, )
-			OFFPEAKUSAGE_OUT=$(grep $MAC $2 | cut -f5 -s -d, )		
-
+			LINE=$(grep $MAC $2)
+			if [ -z "$LINE" ]; then
+				echo "$MAC is a new host !"
+				PEAKUSAGE_IN=0
+				PEAKUSAGE_OUT=0
+				OFFPEAKUSAGE_IN=0
+				OFFPEAKUSAGE_OUT=0
+			else
+				PEAKUSAGE_IN=$(echo $LINE | cut -f2 -s -d, )
+				PEAKUSAGE_OUT=$(echo $LINE | cut -f3 -s -d, )
+				OFFPEAKUSAGE_IN=$(echo $LINE | cut -f4 -s -d, )
+				OFFPEAKUSAGE_OUT=$(echo $LINE | cut -f5 -s -d, )
+			fi
+			
 			if [ "$3" = "offpeak" ]; then
 				OFFPEAKUSAGE_IN=$(($OFFPEAKUSAGE_IN+$IN))
 				OFFPEAKUSAGE_OUT=$(($OFFPEAKUSAGE_OUT+$OUT))
@@ -145,14 +158,22 @@ case $1 in
 	[ -z "$3" ] && echo "Missing argument 3" && exit 1
 	[ -z "$4" ] && USERSFILE="/dev/null" || USERSFILE=$4
 
+	# first do some number crunching - rewrite the database so that it is sorted
 	lock
+	rm -f /tmp/sorted.db
+	cat $2 | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
+	do
+		echo $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$OFFPEAKUSAGE_IN,$OFFPEAKUSAGE_OUT,$MAC,$LASTSEEN >> /tmp/sorted.db
+	done
+	unlock
+
 	# create HTML page
 	echo "<html><head><title>Traffic</title></head><body>" > $3
 	echo "<h1>Total Usage :</h1>" >> $3
 	echo "<table border="1"><tr bgcolor=silver><td>User</td><td>Peak download</td><td>Peak upload</td><td>Offpeak download</td><td>Offpeak upload</td><td>Last seen</td></tr>" >> $3
-	cat $2 | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
+	sort -n /tmp/sorted.db | while IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT MAC LASTSEEN
 	do
-		USER=$(grep $MAC $USERSFILE | cut -f2 -s -d= )
+		USER=$(grep "$MAC" "$USERSFILE" | cut -f2 -s -d= )
 		[ -z "$USER" ] && USER=$MAC
 		echo "<tr><td>$USER</td><td>" >> $3
 		formatnumber "$PEAKUSAGE_IN" $3
@@ -166,10 +187,10 @@ case $1 in
 		echo "$LASTSEEN" >> $3
 		echo "</td></tr>" >> $3
 	done
+	rm -f /tmp/sorted.db
 	echo "</table>" >> $3
 	echo "<br /><small>This page was generated on `date`</small>" >> $3
 	echo "</body></html>" >> $3
-	unlock
 	;;
 
 *)
