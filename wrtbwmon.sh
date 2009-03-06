@@ -14,13 +14,13 @@ formatnumber()
 		echo 0 >> $2
 	else
 	    mega=$(($kilo/1024))
-	    giga=$(($kilo/1048576))
 	    if [ $mega -lt 1 ] ; then
 		    echo "${kilo} k" >> $2
-	    elif [ $giga -lt 1 ] ; then
+	    elif [ $mega -lt 1000 ] ; then
 		    echo "${mega} M" >> $2
 	    else
-		    megafrac=$(((($kilo-$(($giga\*1048576))))/1024))
+			giga=$(($kilo/1048576))
+			megafrac=$(((((($mega-$(($giga\*1024))))\*1000))/1024))
 		    echo "${giga}.${megafrac} G" >> $2
 	    fi
    fi
