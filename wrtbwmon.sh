@@ -6,6 +6,20 @@
 #
 # Based on work from Fredrik Erlandsson (erlis AT linux.nu)
 # Based on traff_graph script by twist - http://wiki.openwrt.org/RrdTrafficWatch
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 formatnumber()
 {
@@ -16,12 +30,12 @@ formatnumber()
 	    mega=$(($kilo/1024))
 	    if [ $mega -lt 1 ] ; then
 		    echo "${kilo} k" >> $2
-	    elif [ $mega -lt 1000 ] ; then
+	    elif [ $mega -lt 1024 ] ; then
 		    echo "${mega} M" >> $2
 	    else
 			giga=$(($kilo/1048576))
-			megafrac=$(((((($mega-$(($giga\*1024))))\*1000))/1024))
-		    echo "${giga}.${megafrac} G" >> $2
+			giga_frac=$(echo $(((($kilo\*1000))/1048576)) | tail -c4)
+		    echo "${giga}.${giga_frac} G" >> $2
 	    fi
    fi
 }
@@ -29,6 +43,10 @@ formatnumber()
 lock()
 {
 	while [ -f /tmp/wrtbwmon.lock ]; do
+		if [ ! -d /proc/$(cat /tmp/wrtbwmon.lock) ]; then
+			echo "WARNING : Lockfile detected but process $(cat /tmp/wrtbwmon.lock) does not exist !"
+			rm -f /tmp/wrtbwmon.lock
+		fi
 		sleep 1
 	done
 	echo $$ > /tmp/wrtbwmon.lock
@@ -43,7 +61,7 @@ case $1 in
 
 "setup" )
 
-	[ -z "$2" ] && echo "Missing argument 2" && exit 1
+	[ -z "$2" ] && echo "ERROR : Missing argument 2" && exit 1
 
 	touch /tmp/arpfile.log
 
@@ -53,7 +71,7 @@ case $1 in
 	#Add the RRDIPT CHAIN to the FORWARD chain (if non existing).
 	iptables -L FORWARD -n | grep RRDIPT > /dev/null
 	if [ $? -ne 0 ]; then
-		echo "iptables chain not found, creating it..."
+		echo "DEBUG : iptables chain not found, creating it..."
 		iptables -I FORWARD -j RRDIPT
 	fi
 
@@ -89,12 +107,10 @@ case $1 in
 	;;
 	
 "update" )
-	[ -z "$2" ] && echo "Missing argument 2" && exit 1
+	[ -z "$2" ] && echo "ERROR : Missing argument 2" && exit 1
 	
-	#HERE you can insert a command to retrieve a abckup in case the database is missing
-	# [ ! -f $2 ] && wget some_url
-	
-	touch $2
+	# Uncomment this line if you want to abort if database not found
+	# [ -f "$2" ] || exit 1
 
 	lock
 
@@ -115,11 +131,11 @@ case $1 in
 		OUT=$(cat /tmp/out.tmp)
 		
 		if [ $IN -gt 0 -o $OUT -gt 0 ];  then
-			echo "New traffic for $MAC since last update : $INk:$OUTk"
+			echo "DEBUG : New traffic for $MAC since last update : $IN k :$OUT k"
 		
 			LINE=$(grep $MAC $2)
 			if [ -z "$LINE" ]; then
-				echo "$MAC is a new host !"
+				echo "DEBUG : $MAC is a new host !"
 				PEAKUSAGE_IN=0
 				PEAKUSAGE_OUT=0
 				OFFPEAKUSAGE_IN=0
@@ -154,8 +170,8 @@ case $1 in
 	
 "publish" )
 
-	[ -z "$2" ] && echo "Missing argument 2" && exit 1
-	[ -z "$3" ] && echo "Missing argument 3" && exit 1
+	[ -z "$2" ] && echo "ERROR : Missing argument 2" && exit 1
+	[ -z "$3" ] && echo "ERROR : Missing argument 3" && exit 1
 	[ -z "$4" ] && USERSFILE="/dev/null" || USERSFILE=$4
 
 	# first do some number crunching - rewrite the database so that it is sorted
