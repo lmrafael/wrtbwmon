@@ -77,7 +77,7 @@ case ${1} in
 	grep ${LAN_IFACE} /proc/net/arp | while read IP TYPE FLAGS MAC MASK IFACE
 	do
 		#Add iptable rules (if non existing).
-		iptables -nL RRDIPT | grep ${IP} > /dev/null
+		iptables -nL RRDIPT | grep "${IP} " > /dev/null
 		if [ $? -ne 0 ]; then
 			iptables -I RRDIPT -d ${IP} -j RETURN
 			iptables -I RRDIPT -s ${IP} -j RETURN
