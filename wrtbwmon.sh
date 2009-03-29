@@ -29,14 +29,14 @@ formatnumber()
     if [ -z "${kilo}" ]; then
 		echo 0 >> ${2}
 	else
-	    mega=$((${kilo}/1024))
+	    mega=$((${kilo}/1000))
 	    if [ ${mega} -lt 1 ] ; then
 		    echo "${kilo} k" >> ${2}
-	    elif [ ${mega} -lt 1024 ] ; then
+	    elif [ ${mega} -lt 1000 ] ; then
 		    echo "${mega} M" >> ${2}
 	    else
-			giga=$((${kilo}/1048576))
-			giga_frac=$(echo $((((${kilo}\*1000))/1048576)) | tail -c4)
+			giga=$((${kilo}/1000000))
+			giga_frac=$(echo ${mega} | tail -c4)
 		    echo "${giga}.${giga_frac} G" >> ${2}
 	    fi
    fi
@@ -102,8 +102,8 @@ case ${1} in
 		#Have to use temporary files because of crappy busybox shell
 		grep ${IP} /tmp/traffic_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
 		do
-			[ "${DST}" = "${IP}" ] && echo $((${BYTES}/1024)) > /tmp/in_$$.tmp
-			[ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1024)) > /tmp/out_$$.tmp
+			[ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
+			[ "${SRC}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/out_$$.tmp
 		done
 		IN=$(cat /tmp/in_$$.tmp)
 		OUT=$(cat /tmp/out_$$.tmp)
