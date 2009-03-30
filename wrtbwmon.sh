@@ -67,9 +67,13 @@ case ${1} in
 	iptables -N RRDIPT 2> /dev/null
 
 	#Add the RRDIPT CHAIN to the FORWARD chain (if non existing).
-	iptables -L FORWARD -n | grep RRDIPT > /dev/null
+	iptables -L FORWARD --line-numbers -n | grep "RRDIPT" | grep "1" > /dev/null
 	if [ $? -ne 0 ]; then
-		echo "DEBUG : iptables chain not found, creating it..."
+		iptables -L FORWARD -n | grep "RRDIPT" > /dev/null
+		if [ $? -eq 0 ]; then
+			echo "DEBUG : iptables chain misplaced, recreating it..."
+			iptables -D FORWARD -j RRDIPT
+		fi
 		iptables -I FORWARD -j RRDIPT
 	fi
 
