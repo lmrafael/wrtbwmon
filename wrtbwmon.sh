@@ -154,7 +154,11 @@ case ${1} in
 
 	[ -z "${2}" ] && echo "ERROR : Missing argument 2" && exit 1
 	[ -z "${3}" ] && echo "ERROR : Missing argument 3" && exit 1
-	[ -z "${4}" ] && USERSFILE="/dev/null" || USERSFILE=${4}
+	
+	USERSFILE="/etc/dnsmasq.conf"
+	[ -f "${USERFILE}" ] || USERSFILE="/tmp/dnsmasq.conf"
+	[ -z "${4}" ] || USERFILE=${4}
+	[ -f "${USERFILE}" ] || USERSFILE="/dev/null"
 
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
@@ -171,7 +175,7 @@ case ${1} in
 	echo "<table border="1"><tr bgcolor=silver><td>User</td><td>Peak download</td><td>Peak upload</td><td>Offpeak download</td><td>Offpeak upload</td><td>Last seen</td></tr>" >> ${3}
 	sort -n /tmp/sorted_$$.tmp | while IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT MAC LASTSEEN
 	do
-		USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d= )
+		USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d, )
 		[ -z "$USER" ] && USER=${MAC}
 		echo "<tr><td>${USER}</td><td>" >> ${3}
 		formatnumber "${PEAKUSAGE_IN}}" ${3}
@@ -204,7 +208,7 @@ case ${1} in
 	echo "   $0 update /tmp/usage.db offpeak"
 	echo "   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt"
 	echo "Note : [user_file] is an optional file to match users with their MAC address"
-	echo "       Its format is : 00:MA:CA:DD:RE:SS=username , with one entry per line"
+	echo "       Its format is : 00:MA:CA:DD:RE:SS,username , with one entry per line"
 	exit
 	;;
 esac
