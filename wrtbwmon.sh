@@ -169,30 +169,37 @@ case ${1} in
 	done
 	unlock
 
-	# create HTML page
-	echo "<html><head><title>Traffic</title></head><body>" > ${3}
-	echo "<h1>Total Usage :</h1>" >> ${3}
-	echo "<table border="1"><tr bgcolor=silver><td>User</td><td>Peak download</td><td>Peak upload</td><td>Offpeak download</td><td>Offpeak upload</td><td>Last seen</td></tr>" >> ${3}
-	sort -n /tmp/sorted_$$.tmp | while IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT MAC LASTSEEN
-	do
-		USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d, )
-		[ -z "$USER" ] && USER=${MAC}
-		echo "<tr><td>${USER}</td><td>" >> ${3}
-		formatnumber "${PEAKUSAGE_IN}}" ${3}
-		echo "</td><td>" >> ${3}
-		formatnumber "${PEAKUSAGE_OUT}" ${3}
-		echo "</td><td>" >> ${3}
-		formatnumber "${OFFPEAKUSAGE_IN}" ${3}
-		echo "</td><td>" >> ${3}
-		formatnumber "${OFFPEAKUSAGE_OUT}" ${3}
-		echo "</td><td>" >> ${3}
-		echo "${LASTSEEN}" >> ${3}
-		echo "</td></tr>" >> ${3}
-	done
-	echo "</table>" >> ${3}
-	echo "<br /><small>This page was generated on `date`</small>" 2>&1 >> ${3}
-	echo "</body></html>" >> ${3}
-	
+        # create HTML page
+        echo "<html><head><title>Traffic</title><script type=\"text/javascript\">" > ${3}
+        echo "function getSize(size) {" >> ${3}
+        echo "var prefix=new Array(\"\",\"k\",\"M\",\"G\",\"T\",\"P\",\"E\",\"Z\"); var base=1000;" >> ${3}
+        echo "var pos=0; while (size>base) { size/=base; pos++; } if (pos > 2) precision=1000; else precision = 1;" >> ${3}
+        echo "return (Math.round(size*precision)/precision)+' '+prefix[pos];}" >> ${3}
+        echo "</script></head><body><h1>Total Usage :</h1>" >> ${3}
+        echo "<table border="1"><tr bgcolor=silver><th>User</th><th>Peak download</th><th>Peak upload</th><th>Offpeak download</th><th>Offpeak upload</th><th>Last seen</th></tr>" >> ${3}
+        echo "<script type=\"text/javascript\">" >> ${3}
+
+        echo "var values = new Array(" >> ${3}
+        sort -n /tmp/sorted_$$.tmp | while IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT MAC LASTSEEN
+        do
+                echo "new Array(" >> ${3}
+                USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d, )
+                [ -z "$USER" ] && USER=${MAC}
+                echo "\"${USER}\",${PEAKUSAGE_IN}000,${PEAKUSAGE_OUT}000,${OFFPEAKUSAGE_IN}000,${OFFPEAKUSAGE_OUT}000,\"${LASTSEEN}\")," >> ${3}
+        done
+        echo "0);" >> ${3}
+
+        echo "for (i=0; i < values.length-1; i++) {document.write(\"<tr><td>\");" >> ${3}
+        echo "document.write(values[i][0]);document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(getSize(values[i][1]));document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(getSize(values[i][2]));document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(getSize(values[i][3]));document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(getSize(values[i][4]));document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(values[i][5]);document.write(\"</td></tr>\");" >> ${3}
+        echo "}</script></table>" >> ${3}
+        echo "<br /><small>This page was generated on `date`</small>" 2>&1 >> ${3}
+        echo "</body></html>" >> ${3}
+
 	#Free some memory
 	rm -f /tmp/*_$$.tmp
 	;;
