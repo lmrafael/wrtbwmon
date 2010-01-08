@@ -23,25 +23,6 @@
 
 LAN_IFACE=$(nvram get lan_ifname)
 
-formatnumber()
-{
-    kilo=$(echo ${1} | sed 's/[^0-9]//g')
-    if [ -z "${kilo}" ]; then
-		echo 0 >> ${2}
-	else
-	    mega=$((${kilo}/1000))
-	    if [ ${mega} -lt 1 ] ; then
-		    echo "${kilo} k" >> ${2}
-	    elif [ ${mega} -lt 1000 ] ; then
-		    echo "${mega} M" >> ${2}
-	    else
-			giga=$((${kilo}/1000000))
-			giga_frac=$(echo ${mega} | tail -c4)
-		    echo "${giga}.${giga_frac} G" >> ${2}
-	    fi
-   fi
-}
-
 lock()
 {
 	while [ -f /tmp/wrtbwmon.lock ]; do
@@ -154,11 +135,7 @@ case ${1} in
 
 	[ -z "${2}" ] && echo "ERROR : Missing argument 2" && exit 1
 	[ -z "${3}" ] && echo "ERROR : Missing argument 3" && exit 1
-	
-	USERSFILE="/etc/dnsmasq.conf"
-	[ -f "${USERFILE}" ] || USERSFILE="/tmp/dnsmasq.conf"
-	[ -z "${4}" ] || USERFILE=${4}
-	[ -f "${USERFILE}" ] || USERSFILE="/dev/null"
+	[ -z "${4}" ] && USERSFILE="/dev/null" || USERSFILE=${4}
 
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
@@ -200,9 +177,9 @@ case ${1} in
         echo "<br /><small>This page was generated on `date`</small>" 2>&1 >> ${3}
         echo "</body></html>" >> ${3}
 
-	#Free some memory
-	rm -f /tmp/*_$$.tmp
-	;;
+        #Free some memory
+        rm -f /tmp/*_$$.tmp
+        ;;
 
 *)
 	echo "Usage : $0 {setup|update|publish} [options...]"
@@ -215,7 +192,7 @@ case ${1} in
 	echo "   $0 update /tmp/usage.db offpeak"
 	echo "   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt"
 	echo "Note : [user_file] is an optional file to match users with their MAC address"
-	echo "       Its format is : 00:MA:CA:DD:RE:SS,username , with one entry per line"
+	echo "       Its format is : 00:MA:CA:DD:RE:SS=username , with one entry per line"
 	exit
 	;;
 esac
