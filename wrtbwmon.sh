@@ -135,7 +135,11 @@ case ${1} in
 
 	[ -z "${2}" ] && echo "ERROR : Missing argument 2" && exit 1
 	[ -z "${3}" ] && echo "ERROR : Missing argument 3" && exit 1
-	[ -z "${4}" ] && USERSFILE="/dev/null" || USERSFILE=${4}
+	
+	USERSFILE="/etc/dnsmasq.conf"
+	[ -f "${USERFILE}" ] || USERSFILE="/tmp/dnsmasq.conf"
+	[ -z "${4}" ] || USERFILE=${4}
+	[ -f "${USERFILE}" ] || USERSFILE="/dev/null"
 
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
@@ -192,7 +196,7 @@ case ${1} in
 	echo "   $0 update /tmp/usage.db offpeak"
 	echo "   $0 publish /tmp/usage.db /www/user/usage.htm /jffs/users.txt"
 	echo "Note : [user_file] is an optional file to match users with their MAC address"
-	echo "       Its format is : 00:MA:CA:DD:RE:SS=username , with one entry per line"
+	echo "       Its format is : 00:MA:CA:DD:RE:SS,username , with one entry per line"
 	exit
 	;;
 esac
