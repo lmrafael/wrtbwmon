@@ -137,9 +137,9 @@ case ${1} in
 	[ -z "${3}" ] && echo "ERROR : Missing argument 3" && exit 1
 	
 	USERSFILE="/etc/dnsmasq.conf"
-	[ -f "${USERFILE}" ] || USERSFILE="/tmp/dnsmasq.conf"
-	[ -z "${4}" ] || USERFILE=${4}
-	[ -f "${USERFILE}" ] || USERSFILE="/dev/null"
+	[ -f "${USERSFILE}" ] || USERSFILE="/tmp/dnsmasq.conf"
+	[ -z "${4}" ] || USERSFILE=${4}
+	[ -f "${USERSFILE}" ] || USERSFILE="/dev/null"
 
 	# first do some number crunching - rewrite the database so that it is sorted
 	lock
