@@ -85,6 +85,8 @@ case ${1} in
 	do
 		#Add new data to the graph. Count in Kbs to deal with 16 bits signed values (up to 2G only)
 		#Have to use temporary files because of crappy busybox shell
+		echo 0 > /tmp/in_$$.tmp
+		echo 0 > /tmp/out_$$.tmp
 		grep ${IP} /tmp/traffic_$$.tmp | while read PKTS BYTES TARGET PROT OPT IFIN IFOUT SRC DST
 		do
 			[ "${DST}" = "${IP}" ] && echo $((${BYTES}/1000)) > /tmp/in_$$.tmp
@@ -92,8 +94,6 @@ case ${1} in
 		done
 		IN=$(cat /tmp/in_$$.tmp)
 		OUT=$(cat /tmp/out_$$.tmp)
-		rm -f /tmp/in_$$.tmp
-		rm -f /tmp/out_$$.tmp
 		
 		if [ ${IN} -gt 0 -o ${OUT} -gt 0 ];  then
 			echo "DEBUG : New traffic for ${MAC} since last update : ${IN}k:${OUT}k"
@@ -106,10 +106,10 @@ case ${1} in
 				OFFPEAKUSAGE_IN=0
 				OFFPEAKUSAGE_OUT=0
 			else
-				PEAKUSAGE_IN=$(echo ${LINE} | cut -f2 -s -d, )
-				PEAKUSAGE_OUT=$(echo ${LINE} | cut -f3 -s -d, )
-				OFFPEAKUSAGE_IN=$(echo ${LINE} | cut -f4 -s -d, )
-				OFFPEAKUSAGE_OUT=$(echo ${LINE} | cut -f5 -s -d, )
+				PEAKUSAGE_IN=$(echo ${LINE} | cut -f3 -s -d, )
+				PEAKUSAGE_OUT=$(echo ${LINE} | cut -f4 -s -d, )
+				OFFPEAKUSAGE_IN=$(echo ${LINE} | cut -f5 -s -d, )
+				OFFPEAKUSAGE_OUT=$(echo ${LINE} | cut -f6 -s -d, )
 			fi
 			
 			if [ "${3}" = "offpeak" ]; then
@@ -122,7 +122,7 @@ case ${1} in
 
 			grep -v "${MAC}" ${2} > /tmp/db_$$.tmp
 			mv /tmp/db_$$.tmp ${2}
-			echo ${MAC},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%d-%m-%Y %H:%M") >> ${2}
+			echo ${MAC},${IP},${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},$(date "+%s") >> ${2}
 		fi
 	done
 	
@@ -141,42 +141,39 @@ case ${1} in
 	[ -z "${4}" ] || USERSFILE=${4}
 	[ -f "${USERSFILE}" ] || USERSFILE="/dev/null"
 
-	# first do some number crunching - rewrite the database so that it is sorted
-	lock
-	touch /tmp/sorted_$$.tmp
-	cat ${2} | while IFS=, read MAC PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
-	do
-		echo ${PEAKUSAGE_IN},${PEAKUSAGE_OUT},${OFFPEAKUSAGE_IN},${OFFPEAKUSAGE_OUT},${MAC},${LASTSEEN} >> /tmp/sorted_$$.tmp
-	done
-	unlock
-
         # create HTML page
         echo "<html><head><title>Traffic</title><script type=\"text/javascript\">" > ${3}
         echo "function getSize(size) {" >> ${3}
-        echo "var prefix=new Array(\"\",\"k\",\"M\",\"G\",\"T\",\"P\",\"E\",\"Z\"); var base=1000;" >> ${3}
-        echo "var pos=0; while (size>base) { size/=base; pos++; } if (pos > 2) precision=1000; else precision = 1;" >> ${3}
-        echo "return (Math.round(size*precision)/precision)+' '+prefix[pos];}" >> ${3}
+        echo "var prefix=new Array(\"\",\"k\",\"M\",\"G\",\"T\",\"P\",\"E\",\"Z\");var base=1000;" >> ${3}
+        echo "var pos=0;while(size>base){size/=base;pos++;}if(pos>2)precision=1000;else precision=1;" >> ${3}
+        echo "return(Math.round(size*precision)/precision)+' '+prefix[pos];}" >> ${3}
         echo "</script></head><body><h1>Total Usage :</h1>" >> ${3}
         echo "<table border="1"><tr bgcolor=silver><th>User</th><th>Peak download</th><th>Peak upload</th><th>Offpeak download</th><th>Offpeak upload</th><th>Last seen</th></tr>" >> ${3}
         echo "<script type=\"text/javascript\">" >> ${3}
 
         echo "var values = new Array(" >> ${3}
-        sort -n /tmp/sorted_$$.tmp | while IFS=, read PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT MAC LASTSEEN
+        lock
+        cat ${2} | while IFS=, read MAC IP PEAKUSAGE_IN PEAKUSAGE_OUT OFFPEAKUSAGE_IN OFFPEAKUSAGE_OUT LASTSEEN
         do
                 echo "new Array(" >> ${3}
                 USER=$(grep "${MAC}" "${USERSFILE}" | cut -f2 -s -d, )
                 [ -z "$USER" ] && USER=${MAC}
-                echo "\"${USER}\",${PEAKUSAGE_IN}000,${PEAKUSAGE_OUT}000,${OFFPEAKUSAGE_IN}000,${OFFPEAKUSAGE_OUT}000,\"${LASTSEEN}\")," >> ${3}
+                echo "\"${USER}\",${PEAKUSAGE_IN}000,${PEAKUSAGE_OUT}000,${OFFPEAKUSAGE_IN}000,${OFFPEAKUSAGE_OUT}000,${LASTSEEN}000)," >> ${3}
         done
+        unlock
         echo "0);" >> ${3}
 
-        echo "for (i=0; i < values.length-1; i++) {document.write(\"<tr><td>\");" >> ${3}
-        echo "document.write(values[i][0]);document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(getSize(values[i][1]));document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(getSize(values[i][2]));document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(getSize(values[i][3]));document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(getSize(values[i][4]));document.write(\"</td><td>\");" >> ${3}
-        echo "document.write(values[i][5]);document.write(\"</td></tr>\");" >> ${3}
+	echo "var dv = new Array();for (i=0;i<values.length-1;i++){found=0;for(j=i+1;j<values.length-1;j++){if(values[i][0]==values[j][0]){" >> ${3}
+	echo "values[j][1]+=values[i][1];values[j][2]+=values[i][2];values[j][3]+=values[i][3];values[j][4]+=values[i][4];values[j][5]=Math.max(values[i][5],values[j][5]);found=1;break;" >> ${3}
+	echo "}}if(found==0){dv.push(values[i]);}}dv.sort(function(a,b){return a[1]-b[1]});" >> ${3}
+
+        echo "for (i=0; i < dv.length; i++) {document.write(\"<tr><td>\");" >> ${3}
+        echo "document.write(dv[i][0]);document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(getSize(dv[i][1]));document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(getSize(dv[i][2]));document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(getSize(dv[i][3]));document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(getSize(dv[i][4]));document.write(\"</td><td>\");" >> ${3}
+        echo "document.write(new Date(dv[i][5]));document.write(\"</td></tr>\");" >> ${3}
         echo "}</script></table>" >> ${3}
         echo "<br /><small>This page was generated on `date`</small>" 2>&1 >> ${3}
         echo "</body></html>" >> ${3}
